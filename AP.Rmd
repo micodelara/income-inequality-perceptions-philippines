@@ -1,0 +1,3592 @@
+---
+title: "Analytics Project"
+author: "Mico de Lara"
+date: "2026-04-09"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(DataExplorer)
+library(dplyr)
+library(scales)
+library(patchwork)
+library(ggridges)
+library(ordinal)
+library(VGAM)
+library(ggeffects)
+library(gt)
+library(tibble)
+library(tidyr)
+library(stringr)
+library(flextable)
+library(officer)
+library(performance)
+```
+
+
+
+
+```{r}
+
+data <- as.data.frame(read_excel("WVS_PHL.xlsx"))
+
+#str(data)
+
+WVS <- data[,c('Q106', 'Q260','Q262', 'Q263', 'Q264', 'Q265', 'Q270', 'Q273', 'Q274', 'Q275R', 'Q279','Q281', 'Q284', 'Q285', 'Q286', 'Q287', 'Q288R', 'Q289', 'Q290')]
+
+WVS2 <- data[,c('Q106', 'Q260','Q262', 'Q263', 'Q264', 'Q265', 'Q270', 'Q273', 'Q274', 'Q275R', 'Q279','Q281', 'Q284', 'Q285', 'Q286', 'Q287', 'Q288R', 'Q289', 'Q290')]
+
+str(WVS)
+
+```
+
+
+
+#Convert to NA
+```{r}
+
+WVS |> 
+  mutate(across(everything(), ~ifelse(.x < 0, NA, .x)))
+```
+
+
+
+#Convert data types
+
+```{r}
+WVS <- WVS |> 
+  mutate(across(-c(Q262,Q270, Q274),factor))
+
+#WVS <- WVS |> 
+#  mutate(across(c('Q106', 'Q275R', 'Q287', 'Q288R'), ordered))
+
+WVS <- WVS |> 
+  mutate(across(c('Q106'), ordered))
+
+
+str(WVS)
+```
+#Recode Q287 Social Class
+
+```{r}
+
+WVS$Q287 <- factor(WVS$Q287,
+                   levels = c(5,4,3,2,1),
+                   labels = c(
+                              'Lower class',
+                              'Working class',
+                              'Lower middle class',
+                              'Upper middle class',
+                              'Upper class'),
+                   ordered = FALSE
+  
+)
+str(WVS$Q287)
+```
+#Relabeling of variables
+```{r}
+
+#Q260
+WVS$Q260 <- factor(WVS$Q260,
+                   levels = c(1,2),
+                   labels = c(
+                              'Male',
+                              'Female'),
+                   ordered = FALSE)
+
+#Q273
+WVS$Q273 <- factor(WVS$Q273,
+                   levels = c(1,2,3,4,5,6),
+                   labels = c(
+                              'Married',
+                              'Living together as married',
+                              'Divorced',
+                              'Separated',
+                              'Widowed',
+                              'Single'),
+                   ordered = FALSE)
+
+#Q275R
+WVS$Q275R <- factor(WVS$Q275R,
+                   levels = c(1,2,3,4),
+                   labels = c(
+                              'Primary',
+                              'Secondary',
+                              'Post-secondary',
+                              'Tertiary'),
+                   ordered = FALSE)
+
+#Q279
+WVS$Q279 <- factor(WVS$Q279,
+                   levels = c(1,2,3,4,5,6,7,8),
+                   labels = c(
+                              'Full time (30 hours a week or more)',
+                              'Part time (less than 30 hours a week)',
+                              'Self employed',
+                              'Retired/pensioned',
+                              'Housewife not otherwise employed',
+                              'Student',
+                              'Unemployed',
+                              'Other'),
+                   ordered = FALSE)
+
+#Q281
+WVS$Q281 <- factor(WVS$Q281,
+                   levels = c(0,1,2,3,4,5,6,7,8,9,10,11),
+                   labels = c(
+                              'Never had a job',
+                              'Professional and technical',
+                              'Higher administrative',
+                              'Clerical',
+                              'Sales',
+                              'Service',
+                              'Skilled worker',
+                              'Semi-skilled worker',
+                              'Unskilled worker',
+                              'Farm worker',
+                              'Farm owner, farm manager',
+                              'JP,KG,TJ: Other'),
+                   ordered = FALSE)
+
+#Q284
+WVS$Q284 <- factor(WVS$Q284,
+                   levels = c(1,2,3),
+                   labels = c(
+                              'Government or public institution',
+                              'Private business or industry',
+                              'Private non-profit organization'
+                              ),
+                   ordered = FALSE)
+
+#Q285
+WVS$Q285 <- factor(WVS$Q285,
+                   levels = c(1,2),
+                   labels = c(
+                              'Yes',
+                              'No'),
+                   ordered = FALSE)
+
+#Q286
+WVS$Q286 <- factor(WVS$Q286,
+                   levels = c(1,2,3,4),
+                   labels = c(
+                              'Save money',
+                              'Just get by',
+                              'Spent some savings and borrowed money',
+                              'Spent savings and borrowed money'),
+                   ordered = FALSE)
+
+#Q288R
+WVS$Q288R <- factor(WVS$Q288R,
+                   levels = c(1,2,3),
+                   labels = c(
+                              'Low',
+                              'Medium',
+                              'High'),
+                   ordered = FALSE)
+
+#Q289
+WVS$Q289 <- factor(WVS$Q289,
+                   levels = c(0,1,2,3,4,5,6,7,8,9),
+                   labels = c(
+                              'Do not belong to a denomination',
+                              'Roman Catholic',
+                              'Protestant',
+                              'Orthodox',
+                              'Jew',
+                              'Muslim',
+                              'Hindu',
+                              'Buddhist',
+                              'Other Christian',
+                              'Other'),
+                   ordered = FALSE)
+
+
+
+
+
+```
+
+
+```{r}
+str(WVS)
+```
+#Descriptive stat
+```{r}
+summary(WVS)
+```
+
+#EDA
+
+```{r}
+#DataExplorer::create_report(WVS)
+```
+
+#Univariate
+
+```{r}
+#Bar Plots Q206
+ggplot(data= WVS, aes(x= Q106)) +
+  geom_bar(fill="skyblue") +
+  theme_minimal() +
+  labs(title="Distribution of Q106: Income equality vs larger income differences")
+
+
+WVS |>
+  filter(!is.na(Q106), !is.na(Q260)) |>
+  ggplot(aes(x = Q260, fill = factor(Q106, levels = 1:10))) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(
+    title = "Q106 by Sex",
+    x = "Sex",
+    y = "Percent within sex",
+    fill = "Q106"
+  ) +
+  theme_minimal()
+
+```
+#Response variable (Bar)
+
+```{r}
+
+WVS |>
+  filter(!is.na(Q106)) |>
+  mutate(Q106 = factor(Q106, levels = 1:10)) |>
+  ggplot(aes(x = Q106)) +
+  geom_bar(aes(y = after_stat(count / sum(count))),
+           fill = "steelblue", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = label_percent(accuracy = 1)) +
+  labs(
+    title = "Views on Income Equality and Income Differences",
+    subtitle = "Q106: 1 = incomes more equal; 10 = larger income differences",
+    x = "Response scale",
+    y = "Percentage of respondents"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+
+##Response variable (Distribution)
+```{r}
+
+```
+
+
+
+#Respondent profile
+
+```{r}
+#Age distribution
+
+mean_age <- mean(WVS2$Q262, na.rm = TRUE)
+median_age <- median(WVS2$Q262, na.rm = TRUE)
+
+ggplot(WVS2, aes(x = Q262)) +
+  geom_histogram(
+    binwidth = 5,
+    fill = "steelblue",
+    color = "white",
+    linewidth = 0.3
+  ) +
+  geom_vline(xintercept = mean_age, linetype = "dashed", linewidth = 0.7) +
+  geom_vline(xintercept = median_age, linetype = "dotted", linewidth = 0.7) +
+  coord_cartesian(xlim = c(15, 90)) +
+  scale_x_continuous(breaks = seq(15, 90, by = 10)) +
+  labs(
+    title = "Age Distribution of Respondents",
+    subtitle = paste0("Mean = ", round(mean_age, 1), ", Median = ", round(median_age, 1)),
+    x = "Age (years)",
+    y = "Number of respondents"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+
+```{r}
+profile_cat <- WVS |>
+  dplyr::select(Q260, Q273, Q275R, Q279, Q289, Q288R) |>
+  dplyr::mutate(dplyr::across(everything(), as.character)) |>
+  tidyr::pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "value"
+  ) |>
+  dplyr::mutate(
+    variable = dplyr::recode(
+      variable,
+      Q260 = "Sex",
+      Q273 = "Marital status",
+      Q275R = "Education",
+      Q279 = "Employment",
+      Q289 = "Religion",
+      Q288R = "Income"
+    )
+  )
+
+p_cat <- ggplot(profile_cat, aes(x = forcats::fct_infreq(value))) +
+  geom_bar(fill = "steelblue", color = "white", linewidth = 0.3) +
+  coord_flip() +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(title = "Respondent Profile", x = NULL, y = "Count") +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    strip.text = element_text(face = "bold"),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+p_cat
+
+```
+#Bivariate EDA
+
+#Violin plot (Q106 vs Education)
+```{r}
+WVS |>
+  filter(!is.na(Q106), !is.na(Q275R)) |>
+  mutate(Q106 = as.numeric(as.character(Q106))) |> 
+  ggplot(aes(x = Q275R, y = Q106)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(breaks = 1:10) +
+  labs(
+    title = "Q106 by Education",
+    x = "Education",
+    y = "Q106"
+  ) +
+  theme_minimal()
+```
+#Boxplot (Q106 vs Education)
+```{r}
+WVS |>
+  filter(!is.na(Q106), !is.na(Q275R)) |>
+  mutate(Q106 = as.numeric(as.character(Q106))) |>
+  ggplot(aes(x = Q275R, y = Q106)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.7) +
+  scale_y_continuous(breaks = 1:10) +
+  labs(
+    title = "Q106 by Education",
+    x = "Education",
+    y = "Q106"
+  ) +
+  theme_minimal()
+```
+
+#Create plotting function [Boxplot]
+
+```{r}
+
+boxplot_Q106 <- function(data, yvar, xvar, ylab, xlab, title){
+  
+  ggplot(data |> filter(!is.na(.data[[xvar]]), !is.na(.data[[yvar]])) |> mutate(across(all_of(yvar), ~ as.numeric(as.character(.x)))), 
+         aes(x=.data[[xvar]], y=.data[[yvar]])) +
+    geom_boxplot(
+      fill="steelblue",
+      width= 0.45,
+      alpha= 0.55,
+      outlier.shape = NA
+    ) +
+    geom_jitter(
+      width=0.12,
+      alpha=0.15, 
+      size=1,
+      height=0
+    ) +
+    scale_y_continuous(breaks=1:10, limits=c(1,10)) +
+    labs(
+      title=title,
+      x=xlab,
+      y=ylab
+    ) +
+    theme_minimal(base_size=12) +
+    theme(
+      plot.title = element_text(face = "bold", hjust = 0.5),
+      axis.title = element_text(face = "bold"),
+      axis.text.x=element_text(angle=30, hjust=1),
+      panel.grid.minor = element_blank()
+    )
+  
+}
+
+```
+
+
+#Against Q106
+```{r}
+bp_educ <- boxplot_Q106(WVS,"Q106", "Q275R", "Q106","Education", "Q106 by Education")
+
+bp_marital <- boxplot_Q106(WVS,"Q106", "Q273", "Q106","Marital Status", "Q106 by Marital Status")
+
+bp_empl <- boxplot_Q106(WVS,"Q106", "Q279", "Q106","Employment Status", "Q106 by Employment Status")
+
+bp_sector <- boxplot_Q106(WVS,"Q106", "Q284", "Q106","Sector of Employment", "Q106 by Sector of Employment")
+
+bp_occgrp <- boxplot_Q106(WVS,"Q106", "Q281", "Q106","Respondent - Occupational group", "Q106 by Respondent - Occupational group")
+
+bp_religous <- boxplot_Q106(WVS,"Q106", "Q289", "Q106","Religious denominations", "Q106 by Religious denominations")
+
+bp_earner <- boxplot_Q106(WVS,"Q106", "Q285", "Q106","Are you the chief wage earner in your house", "Q106 by Are you the chief wage earner in your house")
+
+bp_savings <- boxplot_Q106(WVS,"Q106", "Q286", "Q106","Family savings during past year", "Q106 by Family savings during past year")
+
+bp_class <- boxplot_Q106(WVS,"Q106", "Q287", "Q106","Social class", "Q106 by Social class")
+
+bp_income <- boxplot_Q106(WVS,"Q106", "Q288R", "Q106","Income level", "Q106 by Income level")
+
+
+bp_educ | bp_marital | bp_empl
+bp_sector | bp_occgrp | bp_religous
+bp_earner | bp_savings | bp_class
+```
+
+```{r}
+plot_data <- WVS |>
+  filter(!is.na(Q106), !is.na(Q279)) |>
+  mutate(
+    Q106 = factor(Q106, levels = as.character(1:10)),
+    Q279 = droplevels(Q279)
+  )
+
+ggplot(plot_data, aes(x = Q106, fill = Q279)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Employment Composition by Q106 Category",
+    x = "Q106",
+    y = "Percentage within Q106 category",
+    fill = "Employment status"
+  ) +
+  theme_minimal()
+
+ggplot(plot_data, aes(x = Q106, fill = Q275R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Highest Educational Level Composition by Q106 Category",
+    x = "Q106",
+    y = "Percentage within Q106 category",
+    fill = "Highest educational level"
+  ) +
+  theme_minimal()
+
+ggplot(plot_data, aes(x = Q106, fill = Q288R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Income Level Composition by Q106 Category",
+    x = "Q106",
+    y = "Percentage within Q106 category",
+    fill = "Income level"
+  ) +
+  theme_minimal()
+
+ggplot(plot_data, aes(x = Q106, fill = Q287)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Social Class Composition by Q106 Category",
+    x = "Q106",
+    y = "Percentage within Q106 category",
+    fill = "Social Class"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+#against predictors
+#Part 1: respondent structure
+#education × income
+#sex × employment
+#age × marital status
+```{r}
+sbc1 <- WVS |>
+  filter(!is.na(Q275R), !is.na(Q288R)) |>
+  ggplot(aes(x = Q275R, fill = Q288R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = label_percent()) +
+  labs(
+    title = "Income Composition by Education Level",
+    x = "Education",
+    y = "Percentage within education group",
+    fill = "Income level"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+sbc2 <- WVS |> 
+  filter(!is.na(Q260), !is.na(Q279)) |> 
+  ggplot(aes(x=Q260, fill=Q279)) +
+  geom_bar(position="fill", color="white", linewidth=0.3) +
+  scale_y_continuous(labels= label_percent()) +
+  labs(
+    title="Employment Status by Sex",
+    x="Sex",
+    y= "Percentage within sex",
+    fill="Employment Status"
+  ) +
+   theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+
+
+bp <- ggplot(WVS, aes(x=Q273, y=Q262)) +
+  geom_violin(fill="steelblue", alpha=0.4, trim=F) +
+  geom_boxplot(width=0.2, alpha=0.7 ,outlier.shape=NA) +
+  labs(
+    title="Age vs Marital Status",
+    x="Marital Status",
+    y="Age"
+    
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x=element_text(angle=30, hjust=1)
+  )
+
+
+rig <- WVS |>
+  filter(!is.na(Q262), !is.na(Q273)) |>
+  ggplot(aes(x = Q262, y = Q273, fill = Q273)) +
+  geom_density_ridges(alpha = 0.6, color = "white") +
+  labs(
+    title = "Age Distribution by Marital Status",
+    x = "Age",
+    y = "Marital status"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.title = element_text(face = "bold"),
+    legend.position = "none",
+    panel.grid.minor = element_blank()
+  )
+
+sbc1 | sbc2
+bp | rig
+
+ggsave("plot inc x emp.jpg", plot=sbc1)
+
+```
+
+#Part 2: economic position
+#class × income
+#savings × income
+#employment × savings
+
+```{r}
+#class × income
+class_income_sbc <- WVS |> filter(!is.na(Q287), !is.na(Q288R), Q287!="Don´t know") |> 
+  ggplot(aes(x= Q287, fill=Q288R)) +
+  geom_bar(position="fill", color="white", linewidth=0.3) +
+  scale_y_continuous(labels=label_percent()) +
+  labs(
+    title="Income by Social Class",
+    x="Social class",
+    y="Income",
+    fill="Income level"
+  ) +
+  theme_minimal()
+
+#savings × income
+savings_income_sbc <- WVS |> filter(!is.na(Q286), !is.na(Q288R)) |> 
+  ggplot(aes(x= Q288R, fill=Q286)) +
+  geom_bar(position="fill", color="white", linewidth=0.3) +
+  scale_y_continuous(labels=label_percent()) +
+  labs(
+    title="Savings by income",
+    x="Income",
+    y="Savings",
+    fill="Savings"
+  ) +
+  theme_minimal()
+
+#employment × savings
+emp_savings_sbc <- WVS |> filter(!is.na(Q279), !is.na(Q286)) |> 
+  ggplot(aes(x= Q279, fill=Q286)) +
+  geom_bar(position="fill", color="white", linewidth=0.3) +
+  scale_y_continuous(labels=label_percent()) +
+  labs(
+    title="Savings by Employment",
+    x="Employment",
+    y="Savings",
+    fill="Savings"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle=30, hjust=1)
+  )
+
+class_income_sbc
+savings_income_sbc | emp_savings_sbc
+
+```
+
+#income x emplyment status
+```{r}
+eda_data <- WVS |>
+  filter(!is.na(Q279), !is.na(Q288R)) |>
+  mutate(
+    Q288R = factor(Q288R, levels = c("Low", "Medium", "High")),
+    Q279 = droplevels(Q279)
+  )
+
+inc_emp <- ggplot(eda_data, aes(x = Q279, fill = Q288R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Income Composition by Employment Status",
+    x = "Employment status",
+    y = "Percentage within employment status",
+    fill = "Income group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 70, hjust = 1)
+  )
+
+inc_emp
+#ggsave("income composition by emp.jpg",inc_emp)
+```
+
+
+
+#Recode
+
+```{r}
+#Recode age
+
+WVS <- WVS |> 
+  mutate(Q262=ifelse(WVS$Q262>=18 & WVS$Q262<=29, "18-29", ifelse(WVS$Q262>=30 & WVS$Q262<=44, "30-44", ifelse(WVS$Q262>=45 & WVS$Q262<=59, "45-59", "Above 60"))))
+
+WVS$Q262 <- factor(WVS$Q262)
+
+
+#Recode Racial
+
+WVS <- WVS |>
+  mutate(
+    Q290_recode = factor(
+      Q290,
+      levels = c(
+        608001, 608002, 608003, 608004, 608005, 608006, 608007,
+        608008, 608009, 608010, 608011, 608012, 608013, 608014,
+        608015, 608016, 608017, 608018, 608019, 608020, 608021,
+        608022, 608023, 608024, 608025, 608026, 608027, 608028,
+        608029, 608030, 608031, 608032, 608033, 608034, 608035,
+        608036, 608037, 608038, 608039, 608040, 608041, 608042,
+        608043, 608044, 608045, 608046, 608047, 608048, 608049,
+        608050, 608051, 608053, 608054, 608055, 608056, 608057,
+        608058, 608059, 608060, 608061, 608062
+      ),
+      labels = c(
+        "PH: Tagalog",
+        "PH: Cebuano",
+        "PH: Ilocano",
+        "PH: Bicolano",
+        "PH: Igorot",
+        "PH: Ilonggo",
+        "PH: Masbateño",
+        "PH: Yakan",
+        "PH: Tausug",
+        "PH: Maranao",
+        "PH: Maguindanao",
+        "PH: Waray",
+        "PH: Pangasinense",
+        "PH: Surigaonon",
+        "PH: Marinduque",
+        "PH: Antique",
+        "PH: Ayangan (Kankanaey)",
+        "PH: Tinguian Tribe",
+        "PH: Belwang tribe",
+        "PH: Matinguian Tribe",
+        "PH: Kapampangan",
+        "PH: Sambal",
+        "PH: Mangyan",
+        "PH: Mindanao/Bisaya",
+        "PH: Aklanon",
+        "PH: Romblomanon",
+        "PH: Subanin",
+        "PH: Cantilangnon",
+        "PH: Kamayo",
+        "PH: Samah",
+        "PH: Boholano",
+        "PH: Taga Kaulo",
+        "PH: B'laan",
+        "PH: Chavacano",
+        "PH: Sinamah",
+        "PH: Imus",
+        "PH: Kumalarang",
+        "PH: Labangan",
+        "PH: Langangilang",
+        "PH: Lapu-Lapu (Opon)",
+        "PH: Las Piñas",
+        "PH: Leon",
+        "PH: Liloan",
+        "PH: Lubao",
+        "PH: Malapatan",
+        "PH: Malolos",
+        "PH: Manila",
+        "PH: Maragondon",
+        "PH: Marikina",
+        "PH: Miagao",
+        "PH: Muntinlupa",
+        "PH: Naga",
+        "PH: Nakar",
+        "PH: Navotas",
+        "PH: Oroquieta",
+        "PH: Ozamiz",
+        "PH: Padre Burgos",
+        "PH: Panabo",
+        "PH: Parañaque",
+        "PH: Pasig",
+        "PH: Pili"
+      )
+    )
+  )
+
+str(WVS)
+summary(WVS$Q290)
+```
+#Recode Q290 into fewer groups
+```{r}
+
+WVS <- WVS %>%
+  mutate(
+    Q290_recode = case_when(
+      Q290_recode %in% c(
+        "PH: Tagalog", "PH: Imus", "PH: Las Piñas",
+        "PH: Malolos", "PH: Manila", "PH: Marikina", "PH: Muntinlupa",
+        "PH: Nakar", "PH: Navotas", "PH: Parañaque", "PH: Pasig", "PH: Pili", "PH: Romblomanon", "PH: Marinduque", "PH: Maragondon"
+      ) ~ "Tagalog",
+      
+      Q290_recode == "PH: Ilocano" ~ "Ilocano",
+      
+      Q290_recode %in% c("PH: Bicolano", "PH: Naga") ~ "Bicolano",
+      
+      Q290_recode %in% c(
+        "PH: Cebuano", "PH: Ilonggo", "PH: Masbateño", "PH: Waray",
+        "PH: Surigaonon", "PH: Antique", "PH: Mindanao/Bisaya",
+        "PH: Aklanon", "PH: Cantilangnon",
+        "PH: Boholano", "PH: Miagao", "PH: Lapu-Lapu (Opon)", "PH: Liloan", "PH: Oroquieta", "PH: Ozamiz"
+      ) ~ "Bisaya/Visayan",
+      
+      Q290_recode %in% c(
+        "PH: Igorot", "PH: Ayangan (Kankanaey)", "PH: Tinguian Tribe",
+        "PH: Belwang tribe", "PH: Matinguian Tribe", "PH: Langangilang"
+      ) ~ "Cordillera/Northern Indigenous",
+      
+      Q290_recode %in% c(
+        "PH: Yakan", "PH: Tausug", "PH: Maranao", "PH: Maguindanao",
+        "PH: Samah", "PH: Sinamah", "PH: Subanin", "PH: Taga Kaulo",
+        "PH: B'laan", "PH: Kamayo", "PH: Kumalarang", "PH: Labangan",
+        "PH: Malapatan", "PH: Panabo"
+      ) ~ "Moro/Mindanao groups",
+      
+      Q290_recode %in% c(
+        "PH: Pangasinense", "PH: Kapampangan",
+        "PH: Sambal", "PH: Mangyan", "PH: Chavacano", 
+         "PH: Padre Burgos", "PH: Leon",
+         "PH: Lubao"
+      ) ~ "Tagalog",
+      
+      is.na(Q290_recode) ~ NA_character_,
+      TRUE ~ "Other Philippine groups"
+    )
+  )
+
+WVS$Q290_recode <- factor(WVS$Q290_recode)
+
+table(WVS$Q290_recode, useNA = "ifany")
+```
+
+#EDA ofr income x ethno
+```{r}
+
+eda_data <- WVS |>
+  filter(!is.na(Q290_recode), !is.na(Q288R)) |>
+  mutate(
+    Q290_recode = droplevels(Q290_recode),
+    Q288R = factor(Q288R, levels = c("Low", "Medium", "High"))
+  )
+
+ggplot(eda_data, aes(x = Q290_recode, fill = Q288R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Income Composition by Ethnolinguistic Group",
+    x = "Ethnolinguistic group",
+    y = "Percentage within ethnolinguistic group",
+    fill = "Income level"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+```
+#Ethno x education
+
+```{r}
+
+
+eda_data <- WVS |>
+  filter(!is.na(Q290_recode), !is.na(Q275R)) |>
+  mutate(
+    Q290_recode = droplevels(Q290_recode),
+    Q275R = factor(Q275R, levels = c("Primary", "Secondary", "Post-secondary"))
+  )
+
+ggplot(eda_data, aes(x = Q290_recode, fill = Q275R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Education Composition by Ethnolinguistic Group",
+    x = "Ethnolinguistic group",
+    y = "Percentage within ethnolinguistic group",
+    fill = "Education"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+```
+#ethno x employment
+```{r}
+eda_data <- WVS |>
+  filter(!is.na(Q290_recode), !is.na(Q279)) |>
+  mutate(
+    Q290_recode = droplevels(Q290_recode),
+    Q279 = droplevels(Q279)
+  )
+
+ggplot(eda_data, aes(x = Q290_recode, fill = Q279)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Employment Composition by Ethnolinguistic Group",
+    x = "Ethnolinguistic group",
+    y = "Percentage within ethnolinguistic group",
+    fill = "Employment status"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+```
+#
+
+```{r}
+eda_data <- WVS |>
+  filter(!is.na(Q290_recode), !is.na(Q106)) |>
+  mutate(
+    Q290_recode = droplevels(Q290_recode),
+    Q288R = factor(Q288R, levels = c("Low", "Medium", "High"))
+  )
+
+ggplot(eda_data, aes(x = Q106, fill = Q290_recode)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Ethnolinguistic Group by Q106",
+    x = "Q106",
+    y = "Percentage within ethnolinguistic group",
+    fill = "Ethnolinguistic Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+```
+
+#Bicolanos only
+```{r}
+eda_data_bicol <- WVS |>
+  filter(!is.na(Q290_recode), !is.na(Q106), Q290_recode=="Bicolano") |>
+  mutate(
+    Q290_recode = droplevels(Q290_recode),
+    Q288R = factor(Q288R, levels = c("Low", "Medium", "High"))
+  )
+
+eda_data_bisaya <- WVS |>
+  filter(!is.na(Q290_recode), !is.na(Q106), Q290_recode=="Bisaya/Visayan") |>
+  mutate(
+    Q290_recode = droplevels(Q290_recode),
+    Q288R = factor(Q288R, levels = c("Low", "Medium", "High"))
+  )
+
+
+bicol <- ggplot(eda_data_bicol, aes(x = Q106, fill = Q275R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Ethnolinguistic Group (Bicolano Only) by Q106",
+    x = "Q106",
+    y = "Percentage within ethnolinguistic group",
+    fill = "Educational Attainment"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+
+bisaya <- ggplot(eda_data_bisaya, aes(x = Q106, fill = Q275R)) +
+  geom_bar(position = "fill", color = "white", linewidth = 0.3) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Ethnolinguistic Group (Bisaya Only) by Q106",
+    x = "Q106",
+    y = "Percentage within ethnolinguistic group",
+    fill = "Educational Attainment"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+
+bicol | bisaya
+```
+
+
+
+
+#Modeling
+#PO model
+
+```{r}
+
+WVS_model <- WVS |>
+  select(Q106, Q260, Q262, Q275R, Q279, Q288R, Q287, Q273, Q290_recode, Q286) |>
+  na.omit() |>
+  droplevels()
+
+#Model A: core demographic + SES
+model_A <- clm(Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R, data = WVS_model, link = "logit", threshold = "flexible")
+
+#Model B: add subjective class
+model_B <- clm(Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q287, data = WVS_model, link = "logit", threshold = "flexible")
+
+#Model C: add financial coping instead of class
+model_C <- clm(Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q286, data = WVS_model, link = "logit", threshold = "flexible")
+
+#Model D: add residence only
+model_D <- clm(Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode, data = WVS_model, link = "logit", threshold = "flexible")
+
+#Model E: add marital status only
+model_E <- clm(Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q273, data = WVS_model, link = "logit", threshold = "flexible")
+
+```
+
+
+```{r}
+
+AIC(model_A, model_B, model_C, model_D, model_E)
+anova(model_A, model_B)
+anova(model_A, model_C)
+anova(model_A, model_D)
+anova(model_A, model_E)
+```
+
+#pseudo r squared
+
+```{r}
+#library(performance)
+
+pseudo_r2_results <- tibble(
+  Model = c("model_A", "model_B", "model_C", "model_D", "model_E"),
+  `Pseudo R-squared` = c(
+    r2_nagelkerke(model_A),
+    r2_nagelkerke(model_B),
+    r2_nagelkerke(model_C),
+    r2_nagelkerke(model_D),
+    r2_nagelkerke(model_E)
+  )
+)
+```
+
+
+#Summary Table (Models A-E)
+```{r}
+#library(dplyr)
+#library(tibble)
+#library(flextable)
+#library(officer)
+
+# AIC table
+aic_results <- AIC(model_A, model_B, model_C, model_D, model_E) |>
+  as.data.frame() |>
+  rownames_to_column("Model") |>
+  rename(
+    df = df,
+    AIC = AIC
+  )
+
+# BIC table
+bic_results <- BIC(model_A, model_B, model_C, model_D, model_E) |>
+  as.data.frame() |>
+  rownames_to_column("Model") |>
+  rename(
+    BIC = BIC
+  ) |>
+  select(Model, BIC)
+
+# Model formulas
+model_formulas <- tibble(
+  Model = c("model_A", "model_B", "model_C", "model_D", "model_E"),
+  `Model Name` = c(
+    "Model A: Core demographic + SES",
+    "Model B: Add subjective class",
+    "Model C: Add financial coping",
+    "Model D: Add ethnolinguistic group",
+    "Model E: Add marital status"
+  ),
+  `Model Formula` = c(
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q287",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q286",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q273"
+  )
+)
+
+# Likelihood ratio test p-values versus Model A
+lrt_results <- tibble(
+  Model = c("model_A", "model_B", "model_C", "model_D", "model_E"),
+  `p-value` = c(
+    NA,
+    anova(model_A, model_B)$`Pr(>Chisq)`[2],
+    anova(model_A, model_C)$`Pr(>Chisq)`[2],
+    anova(model_A, model_D)$`Pr(>Chisq)`[2],
+    anova(model_A, model_E)$`Pr(>Chisq)`[2]
+  )
+)
+
+# Combine results
+model_summary <- model_formulas |>
+  left_join(aic_results, by = "Model") |>
+  left_join(bic_results, by = "Model") |>
+  left_join(lrt_results, by = "Model") |>
+  left_join(pseudo_r2_results, by = "Model") |>
+  mutate(
+    AIC = round(AIC, 3),
+    BIC = round(BIC, 3),
+    `Pseudo R-squared` = round(`Pseudo R-squared`, 3),
+    `p-value` = case_when(
+      is.na(`p-value`) ~ "Reference",
+      `p-value` < 0.001 ~ "<0.001",
+      TRUE ~ as.character(round(`p-value`, 3))
+    )
+  ) |>
+  select(
+    `Model Name`,
+    `Model Formula`,
+    df,
+    AIC,
+    BIC,
+    `Pseudo R-squared`,
+    `p-value`
+  )
+
+#model_summary
+
+ft_model_summary <- model_summary |>
+  flextable() |>
+  theme_booktabs() |>
+  bold(part = "header") |>
+  align(align = "center", part = "header") |>
+  align(j = c("df", "AIC", "BIC", "Pseudo R-squared", "p-value"),
+        align = "center", part = "body") |>
+  align(j = c("Model Name", "Model Formula"),
+        align = "left", part = "body") |>
+  fontsize(size = 9, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  padding(padding = 4, part = "all") |>
+  autofit() |>
+  add_footer_lines(
+    "Note. AIC = Akaike Information Criterion. BIC = Bayesian Information Criterion. Pseudo R-squared refers to Nagelkerke's pseudo R-squared. The p-values are based on likelihood ratio tests comparing each expanded model with Model A. Model A serves as the reference model."
+  )
+
+save_as_docx(
+  "Table 1. Summary of Candidate Cumulative Link Models" = ft_model_summary,
+  path = "model_summary_table.docx"
+)
+
+ft_model_summary
+
+```
+
+
+
+#check PO assumption
+
+```{r}
+#Education and income have nominal effects
+
+nominal_test(model_D)
+
+#library(dplyr)
+#library(tibble)
+#library(flextable)
+#library(officer)
+
+nom_test <- nominal_test(model_D)
+
+nom_table <- as.data.frame(nom_test) |>
+  rownames_to_column("Variable") |>
+  filter(Variable != "<none>") |>
+  select(Variable, Df, LRT, `Pr(>Chi)`) |>
+  mutate(
+    Variable = recode(Variable,
+      Q260 = "Q260: Sex",
+      Q262 = "Q262: Age group",
+      Q275R = "Q275R: Educational attainment",
+      Q279 = "Q279: Employment status",
+      Q288R = "Q288R: Income group",
+      Q290_recode = "Q290_recode: Ethnolinguistic group"
+    ),
+    `Chi-square` = round(LRT, 3),
+    `p-value` = case_when(
+      is.na(`Pr(>Chi)`) ~ "",
+      `Pr(>Chi)` < 0.001 ~ "<0.001",
+      TRUE ~ sprintf("%.3f", `Pr(>Chi)`)
+    )
+  ) |>
+  select(Variable, Df, `Chi-square`, `p-value`)
+
+ft_nom <- nom_table |>
+  flextable() |>
+  set_header_labels(
+    Variable = "Variable",
+    Df = "df",
+    `Chi-square` = "χ²",
+    `p-value` = "p-value"
+  ) |>
+  theme_booktabs() |>
+  bold(part = "header") |>
+  align(align = "center", part = "header") |>
+  align(j = c("Df", "Chi-square", "p-value"), align = "center", part = "body") |>
+  align(j = "Variable", align = "left", part = "body") |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  padding(padding = 4, part = "all") |>
+  autofit() |>
+  add_footer_lines(
+    "Note. Results are based on likelihood ratio tests for nominal effects in the cumulative link model. χ² = likelihood ratio chi-square statistic."
+  )
+
+ft_nom
+
+save_as_docx(
+  "Table 2. Tests of Nominal Effects (Model D)" = ft_nom,
+  path = "nominal_effects_table.docx"
+)
+```
+
+#model PPO
+```{r}
+
+model_D_PPO1 <- clm(
+  Q106 ~ Q260 + Q262 + Q279 + Q290_recode,
+  nominal = ~ Q275R + Q288R,
+  data = WVS,
+  link = "logit",
+  threshold = "flexible"
+)
+
+summary(model_D_PPO1) 
+model_D_PPO1$convergence
+model_D_PPO1$cond.H
+model_D_PPO1$aliased
+```
+
+
+```{r}
+m_Q275 <- clm(
+  Q106 ~ Q260 + Q262 + Q279 + Q290_recode +Q288R,
+  nominal = ~ Q275R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+
+m_Q288 <- clm(
+  Q106 ~ Q260 + Q262 + Q279 + Q290_recode +Q275R,
+  nominal = ~ Q288R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+```
+
+
+```{r}
+summary(m_Q275)
+m_Q275$convergence
+m_Q275$cond.H
+m_Q275$aliased
+
+summary(m_Q288)
+m_Q288$convergence
+m_Q288$cond.H
+m_Q288$aliased
+
+anova(model_D, m_Q275)
+anova(model_D, m_Q288)
+AIC(model_D, m_Q275, m_Q288)
+nominal_test(m_Q275)
+nominal_test(m_Q288)
+```
+
+
+```{r}
+scale_test(model_D)
+
+#library(dplyr)
+#library(tibble)
+#library(flextable)
+#library(officer)
+
+scale_test <- scale_test(model_D)
+
+scale_table <- as.data.frame(scale_test) |>
+  rownames_to_column("Variable") |>
+  filter(Variable != "<none>") |>
+  mutate(
+    Variable = recode(Variable,
+      Q260 = "Q260: Sex",
+      Q262 = "Q262: Age group",
+      Q275R = "Q275R: Educational attainment",
+      Q279 = "Q279: Employment status",
+      Q288R = "Q288R: Income group",
+      Q290_recode = "Q290_recode: Ethnolinguistic group"
+    ),
+    `Chi-square` = round(LRT, 3),
+    `p-value` = case_when(
+      `Pr(>Chi)` < 0.001 ~ "<0.001",
+      TRUE ~ sprintf("%.3f", `Pr(>Chi)`)
+    )
+  ) |>
+  select(Variable, Df, `Chi-square`, `p-value`)
+
+scale_table
+
+ft_scale <- scale_table |>
+  flextable() |>
+  set_header_labels(
+    Variable = "Variable",
+    Df = "df",
+    `Chi-square` = "χ²",
+    `p-value` = "p-value"
+  ) |>
+  theme_booktabs() |>
+  bold(part = "header") |>
+  align(align = "center", part = "header") |>
+  align(j = c("Df", "Chi-square", "p-value"), align = "center") |>
+  align(j = "Variable", align = "left") |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  padding(padding = 4, part = "all") |>
+  autofit() |>
+  add_footer_lines(
+    "Note. Results are based on likelihood ratio tests for scale effects in the cumulative link model. χ² = likelihood ratio chi-square statistic."
+  )
+
+ft_scale
+
+save_as_docx(
+  "Table 3. Tests of Scale Effects (Model D)" = ft_scale,
+  path = "scale_effects_table.docx"
+)
+```
+
+```{r}
+model_D_S1 <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode,
+  scale = ~ Q288R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+
+model_D_S2 <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode,
+  scale = ~ Q275R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+
+model_D_S3 <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode,
+  scale = ~ Q275R + Q288R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+
+model_D_S4 <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode,
+  scale = ~ Q275R + Q288R + Q262,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+
+model_D_S5 <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode,
+  scale = ~ Q275R + Q288R + Q290_recode,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+```
+
+
+
+
+```{r}
+nominal_test(model_D_S4)
+```
+
+
+#Using other link functions
+```{r}
+model_D_S4_probit <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode,
+  scale = ~ Q275R + Q288R + Q262,
+  data = WVS_model,
+  link = "probit",
+  threshold = "flexible"
+)
+
+
+model_D_S4_cloglog <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode,
+  scale = ~ Q275R + Q288R + Q262,
+  data = WVS_model,
+  link = "cloglog",
+  threshold = "flexible"
+)
+
+#summary(model_D_S4_probit)
+
+```
+
+
+```{r}
+anova(model_D, model_D_S1)
+anova(model_D, model_D_S2)
+anova(model_D, model_D_S3)
+anova(model_D, model_D_S4)
+anova(model_D, model_D_S5)
+#anova(model_D_S3, model_D_S3_probit)
+
+AIC(model_D, model_D_S1, model_D_S2, model_D_S3, model_D_S4, model_D_S5, model_D_S4_probit, model_D_S4_cloglog)
+```
+
+#summary table for scale effects models
+```{r}
+#library(dplyr)
+#library(tibble)
+#library(flextable)
+#library(performance)
+#library(officer)
+
+# AIC
+aic_results <- AIC(
+  model_D, model_D_S1, model_D_S2,
+  model_D_S3, model_D_S4, model_D_S5
+) |>
+  as.data.frame() |>
+  rownames_to_column("Model")
+
+# BIC
+bic_results <- BIC(
+  model_D, model_D_S1, model_D_S2,
+  model_D_S3, model_D_S4, model_D_S5
+) |>
+  as.data.frame() |>
+  rownames_to_column("Model") |>
+  select(Model, BIC)
+
+# Pseudo R-squared
+pseudo_r2_results <- tibble(
+  Model = c(
+    "model_D", "model_D_S1", "model_D_S2",
+    "model_D_S3", "model_D_S4", "model_D_S5"
+  ),
+  `Pseudo R-squared` = c(
+    r2_nagelkerke(model_D),
+    r2_nagelkerke(model_D_S1),
+    r2_nagelkerke(model_D_S2),
+    r2_nagelkerke(model_D_S3),
+    r2_nagelkerke(model_D_S4),
+    r2_nagelkerke(model_D_S5)
+  )
+)
+
+# Likelihood ratio test p-values vs Model D
+lrt_results <- tibble(
+  Model = c(
+    "model_D", "model_D_S1", "model_D_S2",
+    "model_D_S3", "model_D_S4", "model_D_S5"
+  ),
+  `p-value` = c(
+    NA,
+    anova(model_D, model_D_S1)$`Pr(>Chisq)`[2],
+    anova(model_D, model_D_S2)$`Pr(>Chisq)`[2],
+    anova(model_D, model_D_S3)$`Pr(>Chisq)`[2],
+    anova(model_D, model_D_S4)$`Pr(>Chisq)`[2],
+    anova(model_D, model_D_S5)$`Pr(>Chisq)`[2]
+  )
+)
+
+# Model information
+model_info <- tibble(
+  Model = c(
+    "model_D", "model_D_S1", "model_D_S2",
+    "model_D_S3", "model_D_S4", "model_D_S5"
+  ),
+  `Model Name` = c(
+    "Model D",
+    "Model D_S1",
+    "Model D_S2",
+    "Model D_S3",
+    "Model D_S4",
+    "Model D_S5"
+  ),
+  `Location Formula` = c(
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode",
+    "Q106 ~ Q260 + Q262 + Q275R + Q279 + Q288R + Q290_recode"
+  ),
+  `Scale Formula` = c(
+    "None",
+    "~ Q288R",
+    "~ Q275R",
+    "~ Q275R + Q288R",
+    "~ Q275R + Q288R + Q262",
+    "~ Q275R + Q288R + Q290_recode"
+  )
+)
+
+# Combine table
+scale_model_summary <- model_info |>
+  left_join(aic_results, by = "Model") |>
+  left_join(bic_results, by = "Model") |>
+  left_join(pseudo_r2_results, by = "Model") |>
+  left_join(lrt_results, by = "Model") |>
+  mutate(
+    AIC = format(round(AIC, 3), big.mark = ","),
+    BIC = format(round(BIC, 3), big.mark = ","),
+    `Pseudo R-squared` = round(`Pseudo R-squared`, 3),
+    `p-value` = case_when(
+      is.na(`p-value`) ~ "Reference",
+      `p-value` < 0.001 ~ "<0.001",
+      TRUE ~ sprintf("%.3f", `p-value`)
+    )
+  ) |>
+  select(
+    `Model Name`,
+    `Location Formula`,
+    `Scale Formula`,
+    df,
+    AIC,
+    BIC,
+    `Pseudo R-squared`,
+    `p-value`
+  )
+
+scale_model_summary
+
+# Word-ready table
+ft_scale_models <- scale_model_summary |>
+  flextable() |>
+  theme_booktabs() |>
+  bold(part = "header") |>
+  align(align = "center", part = "header") |>
+  align(
+    j = c("df", "AIC", "BIC", "Pseudo R-squared", "p-value"),
+    align = "center",
+    part = "body"
+  ) |>
+  align(
+    j = c("Model Name", "Location Formula", "Scale Formula"),
+    align = "left",
+    part = "body"
+  ) |>
+  fontsize(size = 9, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  padding(padding = 4, part = "all") |>
+  autofit() |>
+  add_footer_lines(
+    "Note. AIC = Akaike Information Criterion. BIC = Bayesian Information Criterion. Pseudo R-squared refers to Nagelkerke's pseudo R-squared. The p-values are based on likelihood ratio tests comparing each scale-extended model with Model D. Model D serves as the reference model."
+  )
+
+ft_scale_models
+save_as_docx(
+  "Table A2. Comparison of Scale-Extended Cumulative Link Models" = ft_scale_models,
+  path = "scale_model_summary.docx"
+)
+```
+
+
+
+#interaction effects
+```{r}
+model_int_edu_income <- clm(
+  Q106 ~ Q260 + Q262 + Q275R * Q288R + Q279 + Q290_recode,
+  scale = ~ Q275R + Q288R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+
+model_int_emp_income <- clm(
+  Q106 ~ Q260 + Q262 + Q275R + Q279 * Q288R + Q290_recode,
+  scale = ~ Q275R + Q288R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+
+model_int_edu_ethno <- clm(
+  Q106 ~ Q260 + Q262 + Q275R * Q290_recode + Q279 + Q288R,
+  scale = ~ Q275R + Q288R,
+  data = WVS_model,
+  link = "logit",
+  threshold = "flexible"
+)
+```
+
+#AIC and LRT of interaction
+```{r}
+AIC(model_D_S4, model_int_edu_income, model_int_emp_income, model_int_edu_ethno)
+
+anova(model_D_S4, model_int_edu_income)
+anova(model_D_S4, model_int_emp_income)
+anova(model_D_S4, model_int_edu_ethno)
+```
+
+
+
+```{r}
+summary(model_D_S4)
+model_D_S4$convergence
+model_D_S4$cond.H
+model_D_S4$aliased
+```
+
+```{r}
+anova(model_D_S1, model_D_S4)
+anova(model_D_S2, model_D_S4)
+anova(model_D_S3, model_D_S4)
+AIC(model_D_S1, model_D_S2, model_D_S3, model_D_S4)
+```
+
+#Assessment of Model Convergence
+```{r}
+slice.model_D_S4 <- slice(model_D_S4, lambda=5)
+par(mfrow=c(2,3))
+plot(slice.model_D_S4)
+```
+
+
+```{r}
+slice2.model_D_S4 <- slice(model_D_S4, parm = 4:10, lambda = 1e-5)
+par(mfrow = c(1, 2))
+plot(slice2.model_D_S4)
+```
+
+
+#Parameter Accuracy
+```{r}
+convergence(model_D_S4)
+
+```
+
+#Fitted values and predictions
+
+```{r}
+pr2 <- predict_response(model_D_S4, terms = c("Q275R", "Q288R"))
+plot(pr2)
+```
+
+#Selected Best Model
+```{r}
+
+model_best <- model_D_S4
+```
+
+
+#TABLES
+#Model Comparison table
+
+```{r}
+#library(dplyr)
+#library(tibble)
+#library(stringr)
+#library(tidyr)
+#library(flextable)
+#library(officer)
+
+# =========================
+# MODEL LIST
+# =========================
+models <- list(
+  "Model D"    = model_D,
+  "Model D_S1" = model_D_S1,
+  "Model D_S2" = model_D_S2,
+  "Model D_S3" = model_D_S3,
+  "Model D_S4" = model_D_S4,
+  "Model D_S5" = model_D_S5
+)
+
+# Use the base model to recover actual factor reference levels
+mf <- droplevels(model.frame(model_D))
+
+ref_levels <- list(
+  Q260 = levels(mf$Q260)[1],
+  Q262 = levels(mf$Q262)[1],
+  Q275R = levels(mf$Q275R)[1],
+  Q279 = levels(mf$Q279)[1],
+  Q288R = levels(mf$Q288R)[1],
+  Q290_recode = levels(mf$Q290_recode)[1]
+)
+
+# =========================
+# HELPER FUNCTIONS
+# =========================
+
+add_stars <- function(p) {
+  case_when(
+    is.na(p) ~ "",
+    p < 0.001 ~ "***",
+    p < 0.01 ~ "**",
+    p < 0.05 ~ "*",
+    TRUE ~ ""
+  )
+}
+
+format_cell <- function(est, se, p, digits = 3) {
+  if (is.na(est)) return("")
+  
+  paste0(
+    sprintf(paste0("%.", digits, "f"), est),
+    add_stars(p),
+    "\n(",
+    sprintf(paste0("%.", digits, "f"), se),
+    ")"
+  )
+}
+
+extract_clm_part <- function(model, model_name, part = c("beta", "zeta")) {
+  part <- match.arg(part)
+  
+  if (part == "beta") {
+    est <- model$beta
+    panel <- "Location"
+  } else {
+    est <- model$zeta
+    panel <- "Log-scale"
+  }
+  
+  if (length(est) == 0) {
+    return(tibble(
+      term = character(),
+      estimate = numeric(),
+      std_error = numeric(),
+      z_value = numeric(),
+      p_value = numeric(),
+      model = character(),
+      panel = character()
+    ))
+  }
+  
+  V <- vcov(model)
+  se <- sqrt(diag(V)[names(est)])
+  z <- unname(est) / se
+  p <- 2 * pnorm(abs(z), lower.tail = FALSE)
+  
+  tibble(
+    term = names(est),
+    estimate = unname(est),
+    std_error = unname(se),
+    z_value = unname(z),
+    p_value = unname(p),
+    model = model_name,
+    panel = panel
+  )
+}
+
+make_row_label <- function(term) {
+  case_when(
+    str_detect(term, "^Q260") ~ str_remove(term, "^Q260"),
+    str_detect(term, "^Q262") ~ str_remove(term, "^Q262"),
+    str_detect(term, "^Q275R") ~ str_remove(term, "^Q275R"),
+    str_detect(term, "^Q279") ~ str_remove(term, "^Q279"),
+    str_detect(term, "^Q288R") ~ str_remove(term, "^Q288R"),
+    str_detect(term, "^Q290_recode") ~ str_remove(term, "^Q290_recode"),
+    TRUE ~ term
+  )
+}
+
+add_blocks_and_labels <- function(df, ref_levels) {
+  df |>
+    mutate(
+      block = case_when(
+        str_detect(term, "^Q260") ~ paste0("Sex (ref: ", ref_levels$Q260, ")"),
+        str_detect(term, "^Q262") ~ paste0("Age groups (ref: ", ref_levels$Q262, ")"),
+        str_detect(term, "^Q275R") ~ paste0("Education (ref: ", ref_levels$Q275R, ")"),
+        str_detect(term, "^Q279") ~ paste0("Employment status (ref: ", ref_levels$Q279, ")"),
+        str_detect(term, "^Q288R") ~ paste0("Income (ref: ", ref_levels$Q288R, ")"),
+        str_detect(term, "^Q290_recode") ~ paste0("Ethnolinguistic group (ref: ", ref_levels$Q290_recode, ")"),
+        TRUE ~ "Other"
+      ),
+      row_label = make_row_label(term)
+    )
+}
+
+make_wide_table <- function(df) {
+  df |>
+    mutate(cell = mapply(format_cell, estimate, std_error, p_value)) |>
+    select(block, row_label, model, cell) |>
+    pivot_wider(names_from = model, values_from = cell)
+}
+
+insert_block_rows <- function(df, model_names) {
+  blocks <- unique(df$block)
+  
+  out <- lapply(blocks, function(b) {
+    header <- tibble(
+      block = b,
+      row_label = b
+    )
+    
+    for (m in model_names) {
+      header[[m]] <- ""
+    }
+    
+    bind_rows(
+      header,
+      df |> filter(block == b) |> select(-block)
+    )
+  })
+  
+  bind_rows(out)
+}
+
+make_fit_stats <- function(models, model_names = names(models)) {
+  fit_stats <- tibble(
+    row_label = c("AIC", "logLik", "cond.H")
+  )
+  
+  for (m in model_names) {
+    fit_stats[[m]] <- c(
+      round(AIC(models[[m]]), 3),
+      round(as.numeric(logLik(models[[m]])), 3),
+      round(models[[m]]$cond.H, 3)
+    )
+  }
+  
+  fit_stats
+}
+
+make_blank_row <- function(model_names) {
+  blank <- tibble(row_label = "")
+  
+  for (m in model_names) {
+    blank[[m]] <- ""
+  }
+  
+  blank
+}
+
+make_ft <- function(tab, title_text, block_names) {
+  ft <- flextable(tab)
+  
+  ft <- set_header_labels(ft, row_label = "")
+  ft <- theme_booktabs(ft)
+  ft <- autofit(ft)
+  
+  ft <- align(ft, align = "center", part = "all")
+  ft <- align(ft, j = 1, align = "left", part = "body")
+  
+  block_rows <- which(tab$row_label %in% block_names)
+  ft <- bold(ft, i = block_rows, bold = TRUE, part = "body")
+  
+  ft <- add_header_lines(ft, values = title_text)
+  ft <- fontsize(ft, size = 9, part = "all")
+  ft <- font(ft, fontname = "Times New Roman", part = "all")
+  ft <- padding(ft, padding = 4, part = "all")
+  
+  ft
+}
+
+# =========================
+# LOCATION TABLE
+# =========================
+
+loc_long <- bind_rows(lapply(names(models), function(nm) {
+  extract_clm_part(models[[nm]], nm, part = "beta")
+}))
+
+loc_long <- add_blocks_and_labels(loc_long, ref_levels)
+
+loc_wide <- make_wide_table(loc_long)
+
+loc_table <- insert_block_rows(
+  loc_wide,
+  model_names = names(models)
+)
+
+fit_stats <- make_fit_stats(models) |>
+  mutate(across(-row_label, ~ sprintf("%.3f", .x)))
+
+blank_row <- make_blank_row(names(models))
+
+loc_table_full <- bind_rows(
+  loc_table |> select(-block),
+  blank_row,
+  fit_stats
+)
+
+loc_block_names <- c(
+  paste0("Sex (ref: ", ref_levels$Q260, ")"),
+  paste0("Age groups (ref: ", ref_levels$Q262, ")"),
+  paste0("Education (ref: ", ref_levels$Q275R, ")"),
+  paste0("Employment status (ref: ", ref_levels$Q279, ")"),
+  paste0("Income (ref: ", ref_levels$Q288R, ")"),
+  paste0("Ethnolinguistic group (ref: ", ref_levels$Q290_recode, ")")
+)
+
+ft_loc <- make_ft(
+  loc_table_full,
+  "Table X. Regression Coefficients of the Cumulative Link Models (Location Part)",
+  loc_block_names
+)
+
+ft_loc
+
+# =========================
+# LOG-SCALE TABLE
+# =========================
+
+scale_long <- bind_rows(lapply(names(models), function(nm) {
+  extract_clm_part(models[[nm]], nm, part = "zeta")
+}))
+
+scale_long <- scale_long |>
+  filter(!is.na(term), term != "")
+
+scale_long <- add_blocks_and_labels(scale_long, ref_levels)
+
+scale_wide <- make_wide_table(scale_long)
+
+scale_model_names <- unique(scale_long$model)
+
+scale_table <- insert_block_rows(
+  scale_wide,
+  model_names = scale_model_names
+)
+
+scale_fit_stats <- make_fit_stats(
+  models,
+  model_names = scale_model_names
+) |>
+  mutate(across(-row_label, ~ sprintf("%.3f", .x)))
+
+blank_row_scale <- make_blank_row(scale_model_names)
+
+scale_table_full <- bind_rows(
+  scale_table |> select(-block),
+  blank_row_scale,
+  scale_fit_stats
+)
+
+scale_block_names <- unique(scale_long$block)
+
+ft_scale <- make_ft(
+  scale_table_full,
+  "Table Y. Regression Coefficients of the Cumulative Link Models (Log-scale Part)",
+  scale_block_names
+)
+
+ft_scale
+
+# =========================
+# SAVE TO WORD
+# =========================
+
+save_as_docx(
+  "Location coefficients" = ft_loc,
+  "Log-scale coefficients" = ft_scale,
+  path = "clm_tables_model_D.docx"
+)
+```
+
+
+#Marginal Effects Table
+```{r}
+
+
+# =========================
+# CHOOSE YOUR FINAL MODEL
+# =========================
+best_model <- model_best   # change if needed
+
+# =========================
+# RECOVER FITTED MODEL FRAME
+# =========================
+mf <- droplevels(model.frame(best_model))
+
+# =========================
+# REFERENCE LEVELS
+# =========================
+ref_levels <- list(
+  Q260 = levels(mf$Q260)[1],
+  Q262 = levels(mf$Q262)[1],
+  Q275R = levels(mf$Q275R)[1],
+  Q279 = levels(mf$Q279)[1],
+  Q288R = levels(mf$Q288R)[1],
+  Q290_recode = levels(mf$Q290_recode)[1]
+)
+
+# =========================
+# HELPERS
+# =========================
+p_fmt <- function(p) {
+  dplyr::case_when(
+    is.na(p)  ~ "",
+    p < 0.001 ~ "<0.001",
+    TRUE      ~ sprintf("%.3f", p)
+  )
+}
+
+make_row_label <- function(term) {
+  dplyr::case_when(
+    str_detect(term, "^Q260") ~ str_remove(term, "^Q260"),
+    str_detect(term, "^Q262") ~ str_remove(term, "^Q262"),
+    str_detect(term, "^Q275R") ~ str_remove(term, "^Q275R"),
+    str_detect(term, "^Q279") ~ str_remove(term, "^Q279"),
+    str_detect(term, "^Q288R") ~ str_remove(term, "^Q288R"),
+    str_detect(term, "^Q290_recode") ~ str_remove(term, "^Q290_recode"),
+    TRUE ~ term
+  )
+}
+
+make_block <- function(term, ref_levels) {
+  dplyr::case_when(
+    str_detect(term, "^Q260") ~ paste0("Sex (ref: ", ref_levels$Q260, ")"),
+    str_detect(term, "^Q262") ~ paste0("Age groups (ref: ", ref_levels$Q262, ")"),
+    str_detect(term, "^Q275R") ~ paste0("Education (ref: ", ref_levels$Q275R, ")"),
+    str_detect(term, "^Q279") ~ paste0("Employment status (ref: ", ref_levels$Q279, ")"),
+    str_detect(term, "^Q288R") ~ paste0("Income (ref: ", ref_levels$Q288R, ")"),
+    str_detect(term, "^Q290_recode") ~ paste0("Ethnolinguistic group (ref: ", ref_levels$Q290_recode, ")"),
+    TRUE ~ "Other"
+  )
+}
+
+extract_single_clm_part <- function(model, part = c("beta", "zeta"), ref_levels) {
+  part <- match.arg(part)
+
+  if (part == "beta") {
+    est <- model$beta
+    component <- "Location"
+    extra_name <- "Odds ratio"
+  } else {
+    est <- model$zeta
+    component <- "Log-scale"
+    extra_name <- "Scale ratio"
+  }
+
+  if (length(est) == 0) {
+    return(list(
+      data = tibble(),
+      component = component,
+      extra_name = extra_name
+    ))
+  }
+
+  V <- vcov(model)
+  se <- sqrt(diag(V)[names(est)])
+  z  <- unname(est) / se
+  p  <- 2 * pnorm(abs(z), lower.tail = FALSE)
+
+  out <- tibble(
+    term = names(est),
+    block = make_block(names(est), ref_levels),
+    row_label = make_row_label(names(est)),
+    estimate = unname(est),
+    std_error = unname(se),
+    z_value = unname(z),
+    p_value = unname(p),
+    extra = exp(unname(est))
+  ) |>
+    mutate(
+      estimate = round(estimate, 3),
+      std_error = round(std_error, 3),
+      z_value = round(z_value, 3),
+      p_value = p_fmt(p_value),
+      extra = round(extra, 3)
+    )
+
+  list(
+    data = out,
+    component = component,
+    extra_name = extra_name
+  )
+}
+
+# FIXED VERSION: converts columns to character before bind_rows()
+insert_block_rows_single <- function(df) {
+  df <- df |>
+    mutate(
+      estimate = sprintf("%.3f", as.numeric(estimate)),
+      std_error = sprintf("%.3f", as.numeric(std_error)),
+      z_value = sprintf("%.3f", as.numeric(z_value)),
+      extra = sprintf("%.3f", as.numeric(extra)),
+      p_value = as.character(p_value)
+    )
+
+  blocks <- unique(df$block)
+
+  out <- lapply(blocks, function(b) {
+    header <- tibble(
+      row_label = b,
+      estimate = "",
+      std_error = "",
+      z_value = "",
+      p_value = "",
+      extra = ""
+    )
+
+    body <- df |>
+      filter(block == b) |>
+      select(row_label, estimate, std_error, z_value, p_value, extra)
+
+    bind_rows(header, body)
+  })
+
+  bind_rows(out)
+}
+
+make_single_ft <- function(df, title_text, subtitle_text, extra_label) {
+  block_names <- df$row_label[
+    df$estimate == "" & df$std_error == "" & df$z_value == ""
+  ]
+
+  ft <- flextable(df)
+
+  ft <- set_header_labels(
+    ft,
+    row_label = "",
+    estimate = "Estimate",
+    std_error = "SE",
+    z_value = "z",
+    p_value = "p",
+    extra = extra_label
+  )
+
+  ft <- theme_booktabs(ft)
+  ft <- autofit(ft)
+
+  ft <- align(ft, align = "center", part = "all")
+  ft <- align(ft, j = 1, align = "left", part = "body")
+
+  ft <- bold(ft, i = which(df$row_label %in% block_names), bold = TRUE, part = "body")
+
+  ft <- add_header_lines(ft, values = title_text)
+  ft <- add_header_lines(ft, values = subtitle_text)
+
+  ft
+}
+
+# =========================
+# PANEL A: LOCATION COEFFICIENTS
+# =========================
+loc_obj <- extract_single_clm_part(best_model, part = "beta", ref_levels = ref_levels)
+loc_tab <- insert_block_rows_single(loc_obj$data)
+
+ft_loc <- make_single_ft(
+  loc_tab,
+  title_text = "Table X. Final cumulative link model",
+  subtitle_text = "Panel A. Location coefficients",
+  extra_label = loc_obj$extra_name
+)
+
+ft_loc
+
+# =========================
+# PANEL B: LOG-SCALE COEFFICIENTS
+# =========================
+scale_obj <- extract_single_clm_part(best_model, part = "zeta", ref_levels = ref_levels)
+
+if (nrow(scale_obj$data) > 0) {
+  scale_tab <- insert_block_rows_single(scale_obj$data)
+
+  ft_scale <- make_single_ft(
+    scale_tab,
+    title_text = "Table X. Final cumulative link model",
+    subtitle_text = "Panel B. Log-scale coefficients",
+    extra_label = scale_obj$extra_name
+  )
+
+  ft_scale
+}
+
+# =========================
+# OPTIONAL: SAVE TO WORD
+# =========================
+if (exists("ft_scale")) {
+  save_as_docx(
+    "Location coefficients" = ft_loc,
+    "Log-scale coefficients" = ft_scale,
+    path = "final_clm_one_model.docx"
+  )
+} else {
+  save_as_docx(
+    "Location coefficients" = ft_loc,
+    path = "final_clm_one_model.docx"
+  )
+}
+
+
+```
+
+
+
+```{r}
+# analysis sample actually used by the model
+mf <- droplevels(model.frame(model_best))
+
+ref_level <- function(x) levels(x)[1]
+
+newdat <- expand.grid(
+  Q275R = levels(mf$Q275R),
+  Q288R = levels(mf$Q288R),
+  Q260  = ref_level(mf$Q260),
+  Q262  = ref_level(mf$Q262),
+  Q279  = ref_level(mf$Q279),
+  Q290_recode  = ref_level(mf$Q290_recode)
+)
+
+# make sure factor levels match the fitted model exactly
+newdat$Q260  <- factor(newdat$Q260,  levels = levels(mf$Q260))
+newdat$Q262  <- factor(newdat$Q262,  levels = levels(mf$Q262))
+newdat$Q275R <- factor(newdat$Q275R, levels = levels(mf$Q275R))
+newdat$Q279  <- factor(newdat$Q279,  levels = levels(mf$Q279))
+newdat$Q288R <- factor(newdat$Q288R, levels = levels(mf$Q288R))
+newdat$Q290_recode <- factor(newdat$Q290_recode, levels = levels(mf$Q290_recode))
+
+pr <- predict(model_best, newdata = newdat, type = "prob")
+```
+
+```{r}
+
+prob_df <- cbind(newdat, as.data.frame(pr$fit)) |>
+  pivot_longer(
+    cols = starts_with("1") | starts_with("2") | starts_with("3") |
+           starts_with("4") | starts_with("5") | starts_with("6") |
+           starts_with("7") | starts_with("8") | starts_with("9") |
+           starts_with("10"),
+    names_to = "Q106_cat",
+    values_to = "prob"
+  ) |>
+  mutate(Q106_cat = factor(Q106_cat, levels = as.character(1:10)))
+
+heat_df <- prob_df |>
+  mutate(cat_num = as.integer(as.character(Q106_cat))) |>
+  group_by(Q275R, Q288R) |>
+  summarise(
+    p_high = sum(prob[cat_num >= 8]),
+    .groups = "drop"
+  )
+
+ggplot(heat_df, aes(x = Q288R, y = Q275R, fill = p_high)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f%%", 100 * p_high)), size = 4) +
+  labs(
+    title = "Predicted probability of Q106 ≥ 8",
+    subtitle = "Higher values indicate greater probability of being on the individual-incentives side",
+    x = "Income group",
+    y = "Education",
+    fill = "Probability"
+  ) +
+  theme_minimal()
+```
+
+
+#lower end
+```{r}
+heat_low_df <- prob_df |>
+  mutate(cat_num = as.integer(as.character(Q106_cat))) |>
+  group_by(Q275R, Q288R) |>
+  summarise(
+    p_low = sum(prob[cat_num <= 3]),
+    .groups = "drop"
+  )
+
+ggplot(heat_low_df, aes(x = Q288R, y = Q275R, fill = p_low)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f%%", 100 * p_low)), size = 4) +
+  labs(
+    title = "Predicted probability of Q106 ≤ 3",
+    subtitle = "Lower values indicate greater probability of being on the income-equality side",
+    x = "Income group",
+    y = "Education",
+    fill = "Probability"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+collapse_df <- prob_df |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(band, levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)"))
+  ) |>
+  group_by(Q275R, Q288R, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+ggplot(collapse_df, aes(x = Q275R, y = prob, color = Q288R, group = Q288R)) +
+  geom_point(position = position_dodge(width = 0.2), size = 2) +
+  geom_line(position = position_dodge(width = 0.2)) +
+  facet_wrap(~ band) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Education by income group",
+    x = "Education",
+    y = "Predicted probability",
+    color = "Income group"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#library(dplyr)
+#library(tidyr)
+#library(purrr)
+#library(ggplot2)
+#library(scales)
+
+# use your retained final model here
+mod <- model_best
+
+# analysis sample actually used by the model
+mf <- droplevels(model.frame(mod))
+
+# keep only predictors for prediction
+pred_base <- mf |>
+  select(-Q106)
+
+# all education-income combinations to evaluate
+grid_ei <- expand.grid(
+  Q275R = levels(mf$Q275R),
+  Q288R = levels(mf$Q288R),
+  stringsAsFactors = FALSE
+)
+
+# helper: safely extract probability matrix from predict()
+get_prob_mat <- function(pred_obj) {
+  if (is.list(pred_obj) && "fit" %in% names(pred_obj)) {
+    as.data.frame(pred_obj$fit)
+  } else {
+    as.data.frame(pred_obj)
+  }
+}
+
+# for each education-income combination:
+# set Q275R and Q288R to that combo for every row in the sample,
+# predict probabilities row by row,
+# then average the probabilities across rows
+prob_marginal <- purrr::map_dfr(seq_len(nrow(grid_ei)), function(i) {
+
+  edu_i <- grid_ei$Q275R[i]
+  inc_i <- grid_ei$Q288R[i]
+
+  newdata_i <- pred_base |>
+    mutate(
+      Q275R = factor(edu_i, levels = levels(mf$Q275R)),
+      Q288R = factor(inc_i, levels = levels(mf$Q288R))
+    )
+
+  pr_i <- predict(mod, newdata = newdata_i, type = "prob")
+  prob_i <- get_prob_mat(pr_i)
+
+  # average predicted probabilities over all rows
+  avg_prob <- colMeans(prob_i)
+
+  tibble(
+    Q275R = edu_i,
+    Q288R = inc_i,
+    Q106_cat = names(avg_prob),
+    prob = as.numeric(avg_prob)
+  )
+})
+
+# make sure category labels are 1:10 in order
+prob_marginal <- prob_marginal |>
+  mutate(
+    Q106_cat = factor(Q106_cat, levels = as.character(1:10)),
+    Q275R = factor(Q275R, levels = levels(mf$Q275R)),
+    Q288R = factor(Q288R, levels = levels(mf$Q288R))
+  )
+
+# collapse into low / middle / high ranges
+collapse_marginal <- prob_marginal |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(
+      band,
+      levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)")
+    )
+  ) |>
+  group_by(Q275R, Q288R, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+# plot
+pred_plot_educ_income <- ggplot(collapse_marginal,
+       aes(x = Q275R, y = prob, color = Q288R, group = Q288R)) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = percent, limits = c(0, 0.8)) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by education and income group",
+    x = "Education",
+    y = "Predicted probability",
+    color = "Income group"
+  ) +
+  theme_minimal()
+
+pred_plot_educ_income
+
+ggsave(
+  filename = "pred_plot_educ_income.png",
+  plot = pred_plot_educ_income,
+  width = 10,
+  height = 6.5,
+  units = "in",
+  dpi = 300
+)
+```
+#Education x Age group
+```{r}
+# use your retained final model here
+mod <- model_best
+
+# analysis sample actually used by the model
+mf <- droplevels(model.frame(mod))
+
+# keep only predictors for prediction
+pred_base <- mf |>
+  select(-Q106)
+
+# all education-age combinations to evaluate
+grid_ea <- expand.grid(
+  Q275R = levels(mf$Q275R),
+  Q262  = levels(mf$Q262),
+  stringsAsFactors = FALSE
+)
+
+# helper: safely extract probability matrix from predict()
+get_prob_mat <- function(pred_obj) {
+  if (is.list(pred_obj) && "fit" %in% names(pred_obj)) {
+    as.data.frame(pred_obj$fit)
+  } else {
+    as.data.frame(pred_obj)
+  }
+}
+
+# for each education-age combination
+prob_marginal <- purrr::map_dfr(seq_len(nrow(grid_ea)), function(i) {
+  
+  edu_i <- grid_ea$Q275R[i]
+  age_i <- grid_ea$Q262[i]
+  
+  newdata_i <- pred_base |>
+    mutate(
+      Q275R = factor(edu_i, levels = levels(mf$Q275R)),
+      Q262  = factor(age_i, levels = levels(mf$Q262))
+    )
+  
+  pr_i <- predict(mod, newdata = newdata_i, type = "prob")
+  prob_i <- get_prob_mat(pr_i)
+  
+  avg_prob <- colMeans(prob_i)
+  
+  tibble(
+    Q275R = edu_i,
+    Q262 = age_i,
+    Q106_cat = names(avg_prob),
+    prob = as.numeric(avg_prob)
+  )
+})
+
+# make sure category labels are 1:10 in order
+prob_marginal <- prob_marginal |>
+  mutate(
+    Q106_cat = factor(Q106_cat, levels = as.character(1:10)),
+    Q275R = factor(Q275R, levels = levels(mf$Q275R)),
+    Q262 = factor(Q262, levels = levels(mf$Q262))
+  )
+
+# collapse into low / middle / high ranges
+collapse_marginal <- prob_marginal |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(
+      band,
+      levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)")
+    )
+  ) |>
+  group_by(Q275R, Q262, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+# plot
+pred_plot_educ_age <- ggplot(
+  collapse_marginal,
+  aes(x = Q275R, y = prob, color = Q262, group = Q262)
+) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 0.8)) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by education and age group",
+    x = "Education",
+    y = "Predicted probability",
+    color = "Age group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+pred_plot_educ_age
+
+ggsave(
+  filename = "pred_plot_educ_age.jpg",
+  plot = pred_plot_educ_age,
+  width = 10,
+  height = 6.5,
+  units = "in",
+  dpi = 300
+)
+```
+
+#Ethno (ref: Bicolanos)
+```{r}
+# use your retained final model
+mod <- model_best   # replace if needed
+
+# actual estimation sample used by the model
+mf <- droplevels(model.frame(mod))
+
+# keep only predictors
+pred_base <- mf |>
+  select(-Q106)
+
+# all education × ethnolinguistic-group combinations
+grid_eq <- expand.grid(
+  Q275R = levels(mf$Q275R),
+  Q290_recode = levels(mf$Q290_recode),
+  stringsAsFactors = FALSE
+)
+
+# helper to safely extract probability matrix
+get_prob_mat <- function(pred_obj) {
+  if (is.list(pred_obj) && !is.null(pred_obj$fit)) {
+    as.data.frame(pred_obj$fit)
+  } else {
+    as.data.frame(pred_obj)
+  }
+}
+
+# outcome levels
+y_levels <- levels(mf$Q106)
+
+# marginal predictions:
+# for each education × ethnolinguistic combination,
+# replace those two variables for every row in the sample,
+# predict probabilities, then average over all rows
+prob_marginal_eq <- purrr::map_dfr(seq_len(nrow(grid_eq)), function(i) {
+
+  edu_i <- grid_eq$Q275R[i]
+  eth_i <- grid_eq$Q290_recode[i]
+
+  newdata_i <- pred_base |>
+    mutate(
+      Q275R = factor(edu_i, levels = levels(mf$Q275R)),
+      Q290_recode = factor(eth_i, levels = levels(mf$Q290_recode))
+    )
+
+  pr_i <- predict(mod, newdata = newdata_i, type = "prob")
+  prob_i <- get_prob_mat(pr_i)
+
+  # if column names are missing or mismatched, impose outcome levels
+  if (ncol(prob_i) == length(y_levels)) {
+    colnames(prob_i) <- y_levels
+  } else {
+    stop("Prediction output does not have one column per Q106 category.")
+  }
+
+  avg_prob <- colMeans(prob_i)
+
+  tibble(
+    Q275R = edu_i,
+    Q290_recode = eth_i,
+    Q106_cat = names(avg_prob),
+    prob = as.numeric(avg_prob)
+  )
+})
+
+# ensure proper ordering
+prob_marginal_eq <- prob_marginal_eq |>
+  mutate(
+    Q106_cat = factor(Q106_cat, levels = as.character(1:10)),
+    Q275R = factor(Q275R, levels = levels(mf$Q275R)),
+    Q290_recode = factor(Q290_recode, levels = levels(mf$Q290_recode))
+  )
+
+# collapse Q106 into low / middle / high
+collapse_eq <- prob_marginal_eq |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(
+      band,
+      levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)")
+    )
+  ) |>
+  group_by(Q275R, Q290_recode, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+# plot
+pred_plot_educ_ethno <- ggplot(
+  collapse_eq,
+  aes(x = Q275R, y = prob, color = Q290_recode, group = Q290_recode)
+) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by education and ethnolinguistic group",
+    x = "Education",
+    y = "Predicted probability",
+    color = "Ethnolinguistic group"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.box = "vertical",
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1,
+      vjust = 1
+    ),
+    plot.margin = margin(10, 10, 20, 10)
+  )
+
+pred_plot_educ_ethno
+
+ggsave(
+  filename = "pred_plot_educ_ethno.jpg",
+  plot = pred_plot_educ_ethno,
+  width = 10,
+  height = 6.5,
+  units = "in",
+  dpi = 300
+)
+```
+
+
+```{r}
+WVS_model2 <- WVS_model
+WVS_model2$Q290_recode <- relevel(WVS_model2$Q290_recode, ref = "Tagalog")
+
+model_check <- update(model_D_S4, data = WVS_model)
+
+summary(model_check)
+
+ model_best2 <- model_check
+```
+
+
+#Ethno table
+```{r}
+#library(dplyr)
+
+eda_ethno_q106 <- WVS_model %>%
+  mutate(
+    Q106_group = case_when(
+      as.numeric(as.character(Q106)) %in% 1:3 ~ "Low (1-3)",
+      as.numeric(as.character(Q106)) %in% 4:7 ~ "Middle (4-7)",
+      as.numeric(as.character(Q106)) %in% 8:10 ~ "High (8-10)"
+    )
+  ) %>%
+  group_by(Q290_recode, Q106_group) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Q290_recode) %>%
+  mutate(
+    total = sum(n),
+    percent = round(100 * n / total, 1)
+  )
+
+eda_ethno_q106
+```
+
+
+```{r}
+
+
+# Collapse Q106 into Low, Middle, High and compute percentages
+eda_ethno_q106 <- WVS_model %>%
+  mutate(
+    Q106_num = as.numeric(as.character(Q106)),
+    Q106_group = case_when(
+      Q106_num %in% 1:3 ~ "Low (1-3)",
+      Q106_num %in% 4:7 ~ "Middle (4-7)",
+      Q106_num %in% 8:10 ~ "High (8-10)"
+    ),
+    Q106_group = factor(
+      Q106_group,
+      levels = c("Low (1-3)", "Middle (4-7)", "High (8-10)")
+    )
+  ) %>%
+  group_by(Q290_recode, Q106_group) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(Q290_recode) %>%
+  mutate(
+    total = sum(count),
+    percent = 100 * count / total
+  ) %>%
+  ungroup()
+
+# Faceted bar graph
+ggplot(
+  eda_ethno_q106,
+  aes(x = reorder(Q290_recode, -percent), y = percent)
+) +
+  geom_col() +
+  geom_text(
+    aes(label = paste0(round(percent, 1), "%")),
+    vjust = -0.3,
+    size = 3
+  ) +
+  facet_wrap(~ Q106_group, nrow = 1) +
+  labs(
+    title = "Observed Q106 Distribution by Ethnolinguistic Group",
+    subtitle = "Percent within each ethnolinguistic group",
+    x = "Ethnolinguistic group",
+    y = "Percentage"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 35, hjust = 1),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+
+
+
+#Ethno x Education (updated relevel: tagalog)
+```{r}
+
+# use your retained final model
+mod <- model_best2   # replace if needed
+
+# actual estimation sample used by the model
+mf <- droplevels(model.frame(mod))
+
+# keep only predictors
+pred_base <- mf |>
+  select(-Q106)
+
+# all education × ethnolinguistic-group combinations
+grid_eq <- expand.grid(
+  Q275R = levels(mf$Q275R),
+  Q290_recode = levels(mf$Q290_recode),
+  stringsAsFactors = FALSE
+)
+
+# helper to safely extract probability matrix
+get_prob_mat <- function(pred_obj) {
+  if (is.list(pred_obj) && !is.null(pred_obj$fit)) {
+    as.data.frame(pred_obj$fit)
+  } else {
+    as.data.frame(pred_obj)
+  }
+}
+
+# outcome levels
+y_levels <- levels(mf$Q106)
+
+# marginal predictions:
+# for each education × ethnolinguistic combination,
+# replace those two variables for every row in the sample,
+# predict probabilities, then average over all rows
+prob_marginal_eq <- purrr::map_dfr(seq_len(nrow(grid_eq)), function(i) {
+
+  edu_i <- grid_eq$Q275R[i]
+  eth_i <- grid_eq$Q290_recode[i]
+
+  newdata_i <- pred_base |>
+    mutate(
+      Q275R = factor(edu_i, levels = levels(mf$Q275R)),
+      Q290_recode = factor(eth_i, levels = levels(mf$Q290_recode))
+    )
+
+  pr_i <- predict(mod, newdata = newdata_i, type = "prob")
+  prob_i <- get_prob_mat(pr_i)
+
+  # if column names are missing or mismatched, impose outcome levels
+  if (ncol(prob_i) == length(y_levels)) {
+    colnames(prob_i) <- y_levels
+  } else {
+    stop("Prediction output does not have one column per Q106 category.")
+  }
+
+  avg_prob <- colMeans(prob_i)
+
+  tibble(
+    Q275R = edu_i,
+    Q290_recode = eth_i,
+    Q106_cat = names(avg_prob),
+    prob = as.numeric(avg_prob)
+  )
+})
+
+# ensure proper ordering
+prob_marginal_eq <- prob_marginal_eq |>
+  mutate(
+    Q106_cat = factor(Q106_cat, levels = as.character(1:10)),
+    Q275R = factor(Q275R, levels = levels(mf$Q275R)),
+    Q290_recode = factor(Q290_recode, levels = levels(mf$Q290_recode))
+  )
+
+# collapse Q106 into low / middle / high
+collapse_eq <- prob_marginal_eq |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(
+      band,
+      levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)")
+    )
+  ) |>
+  group_by(Q275R, Q290_recode, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+# plot
+pred_plot_educ_ethno <- ggplot(
+  collapse_eq,
+  aes(x = Q275R, y = prob, color = Q290_recode, group = Q290_recode)
+) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by education and ethnolinguistic group",
+    x = "Education",
+    y = "Predicted probability",
+    color = "Ethnolinguistic group"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.box = "vertical",
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1,
+      vjust = 1
+    ),
+    plot.margin = margin(10, 10, 20, 10)
+  )
+
+pred_plot_educ_ethno
+
+ggsave(
+  filename = "pred_plot_educ_ethno.jpg",
+  plot = pred_plot_educ_ethno,
+  width = 10,
+  height = 6.5,
+  units = "in",
+  dpi = 300
+)
+```
+#gender x income
+```{r}
+
+# use your retained final model
+mod <- model_best   # replace if needed
+
+# actual estimation sample used by the model
+mf <- droplevels(model.frame(mod))
+
+# keep only predictors
+pred_base <- mf |>
+  select(-Q106)
+
+# all gender × income combinations
+grid_gi <- expand.grid(
+  Q260 = levels(mf$Q260),
+  Q288R = levels(mf$Q288R),
+  stringsAsFactors = FALSE
+)
+
+# helper to safely extract probability matrix
+get_prob_mat <- function(pred_obj) {
+  if (is.list(pred_obj) && !is.null(pred_obj$fit)) {
+    as.data.frame(pred_obj$fit)
+  } else {
+    as.data.frame(pred_obj)
+  }
+}
+
+# outcome levels
+y_levels <- levels(mf$Q106)
+
+# marginal predictions
+prob_marginal_gi <- purrr::map_dfr(seq_len(nrow(grid_gi)), function(i) {
+
+  sex_i <- grid_gi$Q260[i]
+  inc_i <- grid_gi$Q288R[i]
+
+  newdata_i <- pred_base |>
+    mutate(
+      Q260 = factor(sex_i, levels = levels(mf$Q260)),
+      Q288R = factor(inc_i, levels = levels(mf$Q288R))
+    )
+
+  pr_i <- predict(mod, newdata = newdata_i, type = "prob")
+  prob_i <- get_prob_mat(pr_i)
+
+  if (ncol(prob_i) == length(y_levels)) {
+    colnames(prob_i) <- y_levels
+  } else {
+    stop("Prediction output does not have one column per Q106 category.")
+  }
+
+  avg_prob <- colMeans(prob_i)
+
+  tibble(
+    Q260 = sex_i,
+    Q288R = inc_i,
+    Q106_cat = names(avg_prob),
+    prob = as.numeric(avg_prob)
+  )
+})
+
+# ensure proper ordering
+prob_marginal_gi <- prob_marginal_gi |>
+  mutate(
+    Q106_cat = factor(Q106_cat, levels = as.character(1:10)),
+    Q260 = factor(Q260, levels = levels(mf$Q260)),
+    Q288R = factor(Q288R, levels = levels(mf$Q288R))
+  )
+
+# collapse Q106 into low / middle / high
+collapse_gi <- prob_marginal_gi |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(
+      band,
+      levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)")
+    )
+  ) |>
+  group_by(Q260, Q288R, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+# plot: income on x-axis
+ggplot(
+  collapse_gi,
+  aes(x = Q288R, y = prob, color = Q260, group = Q260)
+) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by income group and gender",
+    x = "Income group",
+    y = "Predicted probability",
+    color = "Gender"
+  ) +
+  theme_minimal()
+```
+
+
+
+#income × ethnolinguistic group
+```{r}
+
+# use your retained final model
+mod <- model_best   # replace if needed
+
+# actual estimation sample used by the model
+mf <- droplevels(model.frame(mod))
+
+# keep only predictors
+pred_base <- mf |>
+  select(-Q106)
+
+# all income × ethnolinguistic-group combinations
+grid_iq <- expand.grid(
+  Q288R = levels(mf$Q288R),
+  Q290_recode = levels(mf$Q290_recode),
+  stringsAsFactors = FALSE
+)
+
+# helper to safely extract probability matrix
+get_prob_mat <- function(pred_obj) {
+  if (is.list(pred_obj) && !is.null(pred_obj$fit)) {
+    as.data.frame(pred_obj$fit)
+  } else {
+    as.data.frame(pred_obj)
+  }
+}
+
+# outcome levels
+y_levels <- levels(mf$Q106)
+
+# marginal predictions:
+# for each income × ethnolinguistic combination,
+# replace those two variables for every row in the sample,
+# predict probabilities, then average over all rows
+prob_marginal_iq <- purrr::map_dfr(seq_len(nrow(grid_iq)), function(i) {
+
+  inc_i <- grid_iq$Q288R[i]
+  eth_i <- grid_iq$Q290_recode[i]
+
+  newdata_i <- pred_base |>
+    mutate(
+      Q288R = factor(inc_i, levels = levels(mf$Q288R)),
+      Q290_recode = factor(eth_i, levels = levels(mf$Q290_recode))
+    )
+
+  pr_i <- predict(mod, newdata = newdata_i, type = "prob")
+  prob_i <- get_prob_mat(pr_i)
+
+  if (ncol(prob_i) == length(y_levels)) {
+    colnames(prob_i) <- y_levels
+  } else {
+    stop("Prediction output does not have one column per Q106 category.")
+  }
+
+  avg_prob <- colMeans(prob_i)
+
+  tibble(
+    Q288R = inc_i,
+    Q290_recode = eth_i,
+    Q106_cat = names(avg_prob),
+    prob = as.numeric(avg_prob)
+  )
+})
+
+# ensure proper ordering
+prob_marginal_iq <- prob_marginal_iq |>
+  mutate(
+    Q106_cat = factor(Q106_cat, levels = as.character(1:10)),
+    Q288R = factor(Q288R, levels = levels(mf$Q288R)),
+    Q290_recode = factor(Q290_recode, levels = levels(mf$Q290_recode))
+  )
+
+# collapse Q106 into low / middle / high
+collapse_iq <- prob_marginal_iq |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(
+      band,
+      levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)")
+    )
+  ) |>
+  group_by(Q288R, Q290_recode, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+# plot
+ggplot(
+  collapse_iq,
+  aes(x = Q288R, y = prob, color = Q290_recode, group = Q290_recode)
+) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by income and ethnolinguistic group",
+    x = "Income",
+    y = "Predicted probability",
+    color = "Ethnolinguistic group"
+  ) +
+  theme_minimal()
+```
+
+#IncomexEmployment
+```{r}
+
+library(purrr)
+
+
+# use your retained final model
+mod <- model_best   # replace if needed
+
+# actual estimation sample used by the model
+mf <- droplevels(model.frame(mod))
+
+# predictors only
+pred_base <- mf |>
+  select(-Q106)
+
+# outcome levels
+y_levels <- levels(mf$Q106)
+
+# -------------------------
+# 1. Collapse employment categories for plotting
+# -------------------------
+collapse_q279 <- function(x) {
+  case_when(
+    x %in% c("Full time (30 hours a week or more)",
+             "Part time (less than 30 hours a week)") ~ "Employed",
+    x == "Self employed" ~ "Self-employed",
+    x == "Unemployed" ~ "Unemployed",
+    x == "Housewife not otherwise employed" ~ "Homemaker",
+    x == "Retired/pensioned" ~ "Retired/pensioned",
+    x == "Student" ~ "Student",
+    TRUE ~ "Other"
+  )
+}
+
+# map original Q279 levels to collapsed groups
+q279_map <- tibble(
+  Q279 = levels(mf$Q279),
+  emp_collapsed = collapse_q279(levels(mf$Q279))
+)
+
+# weights of original Q279 levels within each collapsed group
+# based on the estimation sample
+q279_weights <- mf |>
+  count(Q279) |>
+  left_join(q279_map, by = "Q279") |>
+  group_by(emp_collapsed) |>
+  mutate(weight = n / sum(n)) |>
+  ungroup()
+
+# order of collapsed employment groups in the plot
+emp_levels <- c("Employed", "Self-employed", "Unemployed",
+                "Homemaker", "Retired/pensioned","Student", "Other")
+
+# all collapsed employment × income combinations
+grid_ei <- expand.grid(
+  emp_collapsed = emp_levels,
+  Q288R = levels(mf$Q288R),
+  stringsAsFactors = FALSE
+)
+
+# -------------------------
+# 2. Helper to safely extract probability matrix
+# -------------------------
+get_prob_mat <- function(pred_obj, y_levels) {
+  prob_mat <- if (is.list(pred_obj) && !is.null(pred_obj$fit)) {
+    pred_obj$fit
+  } else {
+    pred_obj
+  }
+
+  prob_mat <- as.data.frame(prob_mat)
+
+  if (ncol(prob_mat) != length(y_levels)) {
+    stop("Prediction output does not have one column per Q106 category.")
+  }
+
+  colnames(prob_mat) <- y_levels
+  prob_mat
+}
+
+# -------------------------
+# 3. Marginal predictions for collapsed employment × income
+# -------------------------
+prob_emp_income <- purrr::map_dfr(seq_len(nrow(grid_ei)), function(i) {
+
+  emp_i <- grid_ei$emp_collapsed[i]
+  inc_i <- grid_ei$Q288R[i]
+
+  # original Q279 levels inside this collapsed employment group
+  q279_sub <- q279_weights |>
+    filter(emp_collapsed == emp_i)
+
+  # weighted average across original Q279 levels within this collapsed group
+  avg_prob_i <- purrr::map2_dfr(q279_sub$Q279, q279_sub$weight, function(q279_level, w) {
+
+    newdata_i <- pred_base |>
+      mutate(
+        Q279 = factor(q279_level, levels = levels(mf$Q279)),
+        Q288R = factor(inc_i, levels = levels(mf$Q288R))
+      )
+
+    pr_i <- predict(mod, newdata = newdata_i, type = "prob")
+    prob_i <- get_prob_mat(pr_i, y_levels)
+
+    tibble(
+      Q106_cat = y_levels,
+      prob = colMeans(prob_i) * w
+    )
+  }) |>
+    group_by(Q106_cat) |>
+    summarise(prob = sum(prob), .groups = "drop")
+
+  tibble(
+    emp_collapsed = emp_i,
+    Q288R = inc_i,
+    Q106_cat = avg_prob_i$Q106_cat,
+    prob = avg_prob_i$prob
+  )
+})
+
+# ensure correct ordering
+prob_emp_income <- prob_emp_income |>
+  mutate(
+    emp_collapsed = factor(emp_collapsed, levels = emp_levels),
+    Q288R = factor(Q288R, levels = levels(mf$Q288R)),
+    Q106_cat = factor(Q106_cat, levels = as.character(1:10))
+  )
+
+# -------------------------
+# 4. Collapse Q106 into Low / Middle / High
+# -------------------------
+collapse_emp_income <- prob_emp_income |>
+  mutate(
+    cat_num = as.integer(as.character(Q106_cat)),
+    band = case_when(
+      cat_num <= 3 ~ "Low (1–3)",
+      cat_num <= 7 ~ "Middle (4–7)",
+      TRUE         ~ "High (8–10)"
+    ),
+    band = factor(
+      band,
+      levels = c("Low (1–3)", "Middle (4–7)", "High (8–10)")
+    )
+  ) |>
+  group_by(emp_collapsed, Q288R, band) |>
+  summarise(prob = sum(prob), .groups = "drop")
+
+# -------------------------
+# 5. Plot
+# -------------------------
+ggplot(
+  collapse_emp_income,
+  aes(x = emp_collapsed, y = prob, color = Q288R, group = Q288R)
+) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by employment status and income group",
+    x = "Employment status",
+    y = "Predicted probability",
+    color = "Income group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  )
+```
+
+```{r}
+ggplot(
+  collapse_emp_income,
+  aes(x = Q288R, y = prob, color = emp_collapsed, group = emp_collapsed)
+) +
+  geom_point(size = 2) +
+  geom_line() +
+  facet_wrap(~ band, nrow = 1) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Collapsed predicted probabilities of Q106",
+    subtitle = "Marginal predictions by income group and employment status",
+    x = "Income group",
+    y = "Predicted probability",
+    color = "Employment status"
+  ) +
+  theme_minimal()
+```
+
+
+
+```{r}
+loc_df <- data.frame(
+  term = names(model_best$beta),
+  estimate = unname(model_best$beta),
+  se = sqrt(diag(vcov(model_best)))[names(model_best$beta)]
+) |>
+  mutate(
+    part = "Location",
+    lower = estimate - 1.96 * se,
+    upper = estimate + 1.96 * se
+  )
+
+scale_df <- data.frame(
+  term = names(model_best$zeta),
+  estimate = unname(model_best$zeta),
+  se = sqrt(diag(vcov(model_best)))[names(model_best$zeta)]
+) |>
+  mutate(
+    part = "Log-scale",
+    lower = estimate - 1.96 * se,
+    upper = estimate + 1.96 * se
+  )
+
+coef_df <- bind_rows(loc_df, scale_df)
+
+ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate))) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point() +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.15) +
+  facet_wrap(~ part, scales = "free_y") +
+  labs(
+    title = "Coefficient plot for model_D_S4",
+    x = "Estimate (95% CI)",
+    y = NULL
+  ) +
+  theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+WVS2 <- droplevels(model.frame(model_best))
+
+# Extract model components
+alpha <- model_best$alpha   # thresholds
+beta  <- model_best$beta    # location coefficients
+zeta  <- model_best$zeta    # scale coefficients
+
+# Helper: return 0 if coefficient is the reference category
+get_coef <- function(coefs, name) {
+  if (name %in% names(coefs)) coefs[name] else 0
+}
+
+# Use your actual factor levels
+edu_levels <- levels(WVS2$Q275R)
+inc_levels <- levels(WVS2$Q288R)
+
+# Create education-income combinations
+profiles <- expand.grid(
+  Q275R = edu_levels,
+  Q288R = inc_levels
+)
+
+# Compute location and scale for each profile
+profiles <- profiles |>
+  rowwise() |>
+  mutate(
+    location =
+      get_coef(beta, paste0("Q275R", Q275R)) +
+      get_coef(beta, paste0("Q288R", Q288R)),
+
+    log_scale =
+      get_coef(zeta, paste0("Q275R", Q275R)) +
+      get_coef(zeta, paste0("Q288R", Q288R)),
+
+    scale = exp(log_scale)
+  ) |>
+  ungroup()
+
+profiles
+```
+
+```{r}
+# x-axis range for the latent variable
+x_grid <- seq(min(alpha) - 3, max(alpha) + 3, length.out = 1000)
+
+plot_data <- profiles |>
+  tidyr::crossing(x = x_grid) |>
+  mutate(
+    density = dlogis(x, location = location, scale = scale),
+    profile = paste(Q275R, Q288R, sep = " | ")
+  )
+
+threshold_data <- data.frame(
+  threshold = alpha,
+  label = names(alpha)
+)
+
+ggplot(plot_data, aes(x = x, y = density)) +
+  geom_line(linewidth = 1) +
+  geom_vline(
+    data = threshold_data,
+    aes(xintercept = threshold),
+    linetype = "dashed",
+    inherit.aes = FALSE
+  ) +
+  facet_grid(Q275R ~ Q288R) +
+  labs(
+    title = "Model-implied latent distributions by education and income group",
+    subtitle = "Dashed vertical lines are the estimated Q106 thresholds",
+    x = "Latent attitude toward income equality vs individual incentives",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+
+```{r}
+
+# ----------------------------
+# 1. Parameters
+# ----------------------------
+
+# Option A: use artificial/example thresholds
+#theta <- seq(-2.2, 2.2, length.out = 9)
+
+# Option B: use your actual clm thresholds instead
+ theta <- as.numeric(model_best$alpha)
+
+mu <- 0
+sigma <- 1
+
+x <- seq(min(theta) - 2, max(theta) + 2, length.out = 4000)
+
+# ----------------------------
+# 2. Create density data
+# ----------------------------
+
+df <- tibble(
+  x = x,
+  density = dlogis(x, location = mu, scale = sigma)
+) |>
+  mutate(
+    category = cut(
+      x,
+      breaks = c(-Inf, theta, Inf),
+      labels = paste0("Y = ", 1:10),
+      right = TRUE
+    )
+  )
+# ----------------------------
+# 3. Threshold labels
+# ----------------------------
+
+theta_df <- tibble(
+  theta = theta,
+  label = paste0("theta[", 1:9, "]")
+)
+
+# ----------------------------
+# 4. Plot
+# ----------------------------
+
+ggplot(df, aes(x = x)) +
+  geom_area(
+    aes(y = density, fill = category),
+    alpha = 0.85,
+    color = "black",
+    linewidth = 0.25
+  ) +
+  geom_line(aes(y = density), linewidth = 0.8) +
+  geom_vline(
+    xintercept = theta,
+    linetype = "dotted",
+    linewidth = 0.5
+  ) +
+  annotate(
+    "text",
+    x = theta,
+    y = -0.015,
+    label = paste0("theta[", 1:9, "]"),
+    parse = TRUE,
+    size = 3
+  ) +
+  annotate(
+    "segment",
+    x = min(x),
+    xend = max(x),
+    y = 0,
+    yend = 0,
+    arrow = arrow(length = unit(0.18, "cm")),
+    linewidth = 0.5
+  ) +
+  labs(
+    title = "Latent-variable illustration for a 10-level ordinal response",
+    subtitle = "Thresholds divide the latent continuum into observed Q106 categories",
+    x = "Latent attitude toward income equality vs individual incentives",
+    y = NULL,
+    fill = "Observed category"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()
+  )
+```
+#summary stat table
+```{r}
+
+
+#mf <- droplevels(model.frame(model_best))
+
+mf <- WVS[,c("Q106", "Q260", "Q262", "Q273","Q275R", "Q279", "Q286","Q287","Q288R","Q290_recode")]
+
+vars <- c(
+  "Q106", "Q260", "Q262", "Q273", "Q275R",
+  "Q279", "Q286", "Q287", "Q288R", "Q290_recode"
+)
+
+var_labels <- c(
+  Q106 = "Q106: Perception of income equality",
+  Q260 = "Q260: Sex",
+  Q262 = "Q262: Age group",
+  Q273 = "Q273: Marital status",
+  Q275R = "Q275R: Educational attainment",
+  Q279 = "Q279: Employment status",
+  Q286 = "Q286: Family savings during past year",
+  Q287 = "Q287: Social class (subjective)",
+  Q288R = "Q288R: Income group",
+  Q290_recode = "Q290_recode: Ethnolinguistic group"
+)
+
+desc_table <- map_dfr(vars, function(v) {
+  
+  total_n <- sum(!is.na(mf[[v]]))
+  missing_n <- sum(is.na(mf[[v]]))
+  
+  var_label_with_n <- paste0(
+    var_labels[[v]],
+    " (n=", format(total_n, big.mark = ","),
+    ", missing=", format(missing_n, big.mark = ","),
+    ")"
+  )
+  
+  mf |>
+    count(.data[[v]], name = "Frequency") |>
+    mutate(
+      Variable = var_label_with_n,
+      Category = ifelse(is.na(.data[[v]]), "Missing", as.character(.data[[v]])),
+      Percent = Frequency / total_n * 100
+    ) |>
+    filter(Category != "Missing") |>
+    select(Variable, Category, Frequency, Percent)
+}) |>
+  mutate(
+    Frequency = format(Frequency, big.mark = ","),
+    Percent = paste0(round(Percent, 1), "%")
+  )
+
+# Publication-ready Word table
+ft_desc <- desc_table |>
+  flextable() |>
+  set_header_labels(
+    Variable = "Variable Code and Label",
+    Category = "Category / Sub-variable",
+    Frequency = "Frequency",
+    Percent = "Percent"
+  ) |>
+  merge_v(j = "Variable") |>          # makes first column appear once
+  valign(j = "Variable", valign = "top") |>
+  theme_booktabs() |>
+  bold(part = "header") |>
+  align(align = "center", part = "header") |>
+  align(j = c("Frequency", "Percent"), align = "center", part = "body") |>
+  align(j = c("Variable", "Category"), align = "left", part = "body") |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  padding(padding = 4, part = "all") |>
+  autofit()
+
+ft_desc
+
+save_as_docx(
+  "Table 1. Descriptive Statistics of Variables Included in the Analysis" = ft_desc,
+  path = "descriptive_statistics.docx"
+)
+```
+
+
+
